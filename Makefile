@@ -1,8 +1,5 @@
 #!make
 
-include $(CURDIR)/.env
-export $(shell sed 's/=.*//' .env)
-
 # Allow override for moby or another runtime
 export DOCKER ?= docker
 
@@ -13,36 +10,64 @@ export MKDIR ?= mkdir
 
 DIST_DIR := $(CURDIR)/dist
 
-export OPENCV_GIT_VERSION
-export DOCKERFILE ?= Dockerfile.bionic
-export CUDA_ARCH_BIN := 3.0;3.5;3.7;5.0;5.2;6.0;6.1;7.0;7.5
-export IMAGE ?= INVALID
-export TAG ?= INVALID
+export OPENCV_GIT_VERSION ?= 4.1.2
+export OPENCV_DIST_IMAGE ?= opencv-dist/$(OPENCV_GIT_VERSION)
+export OPENCV_DOCKERFILE ?= opencv.Dockerfile
+export WHEELHOUSE_DOCKERFILE ?= wheelhouse.Dockerfile
+export WHEELHOUSE_TAG ?= app-wheelhouse
+export DEPENDENCIES_DOCKERFILE ?= dependencies.Dockerfile
+export APP_DOCKERFILE ?= Dockerfile
+export APP_TAG ?= demo-app
+export IMAGE ?= arm32v7/python:3.7.5-slim-buster
+export ARCH := $(shell ${DOCKER} run ${DOCKER_RUN_ARGS} --rm busybox uname -m)
 
-set-opencv-4.0.1:
-	$(eval OPENCV_GIT_VERSION:=4.0.1)
-
-10.0-cudnn7-devel-ubuntu18.04:
-	$(eval IMAGE:=nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04)
-
-build-cuda:
-	$(eval TAG:=opencv-$(OPENCV_GIT_VERSION)-builder)
-	
+wheelhouse:
 	$(DOCKER) build $(DOCKER_BUILD_ARGS) \
 					--build-arg IMAGE=$(IMAGE) \
+					-t $(WHEELHOUSE_TAG) \
+					-f $(CURDIR)/$(WHEELHOUSE_DOCKERFILE) \
+					.
+
+app:
+	$(DOCKER) build $(DOCKER_BUILD_ARGS) \
+					--squash \
+					--build-arg IMAGE=$(IMAGE) \
+					--build-arg OPENCV_DEPENDENCIES=$(OPENCV_DIST_IMAGE) \
+					--build-arg WHEELHOUSE=$(WHEELHOUSE_TAG) \
+					-t $(APP_TAG) \
+					-f $(CURDIR)/$(APP_DOCKERFILE) \
+					.
+
+opencv:
+	$(eval TAG:=opencv-$(OPENCV_GIT_VERSION)-builder)
+	echo "Building OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH).sh"
+	$(DOCKER) build $(DOCKER_BUILD_ARGS) \
 					--build-arg OPENCV_GIT_VERSION=$(OPENCV_GIT_VERSION) \
-					--build-arg CUDA_ARCH_BIN="$(CUDA_ARCH_BIN)" \
+					--build-arg IMAGE=$(IMAGE) \
 					-t $(TAG) \
-					-f $(CURDIR)/$(DOCKERFILE) \
-					$(DOCKER_CONTEXT)
+					-f $(CURDIR)/$(OPENCV_DOCKERFILE) \
+					.
 
 	$(MKDIR) -p $(DIST_DIR)
 	rm -f $(TAG).cid
+
 	$(DOCKER) run --cidfile $(TAG).cid $(TAG)
-	# TODO: replace x86_64 with something like:
-	#     "$(${DOCKER} run ${DOCKER_RUN_ARGS} --rm busybox uname -m)"
-	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-x86_64.sh $(DIST_DIR)
+
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH)-dev.deb $(DIST_DIR)
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH)-libs.deb $(DIST_DIR) 
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH)-licenses.deb $(DIST_DIR)
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH)-main.deb $(DIST_DIR)
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH)-python.deb $(DIST_DIR)
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH)-scripts.deb $(DIST_DIR)
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH).sh $(DIST_DIR)
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH).tar.Z $(DIST_DIR)
+	$(DOCKER) cp $$(cat $(TAG).cid):/opencv/build/OpenCV-$(OPENCV_GIT_VERSION)-$(ARCH).tar.gz $(DIST_DIR)
+
+	$(DOCKER) build $(DOCKER_BUILD_ARGS) \
+				--build-arg IMAGE=$(IMAGE) \
+				-t $(OPENCV_DIST_IMAGE) \
+				-f $(CURDIR)/$(DEPENDENCIES_DOCKERFILE) \
+				./dist/
+
 	$(DOCKER) rm $$(cat $(TAG).cid) && rm $(TAG).cid
 	$(DOCKER) image rm $(TAG)
-
-opencv-4.0.1-10.0-cudnn7-devel-ubuntu18.04: | set-opencv-4.0.1 10.0-cudnn7-devel-ubuntu18.04 build-cuda

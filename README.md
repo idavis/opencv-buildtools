@@ -1,31 +1,16 @@
 # OpenCV Build Tools
 
-Scaffolding around the compilation of OpenCV
 
-The `Makefile` only supports CUDA builds at the moment. For a desired CUDA configuration, the `Dockerfile`'s base image can be updated and a recipe added to the `Makefile`.
 
-## Usage
+https://docs.opencv.org/master/d2/de6/tutorial_py_setup_in_ubuntu.html
+https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html
 
-Run `make` with a target and the output will be copied to `./dist/OpenCV-<version>-<platform>.sh`
-
-Example:
-
-`make opencv-4.0.1-10.0-cudnn7-devel-ubuntu18.04`
-
-## Installation
-
-In a `Dockerfile`
-
-```docker
-ARG URL
-ARG OPENCV_PACKAGE=OpenCV-4.0.1-x86_64.sh
-RUN wget --no-check-certificate $URL/$OPENCV_PACKAGE && \
-    chmod +x ./$OPENCV_PACKAGE && \
-    ./$OPENCV_PACKAGE --prefix=/usr/local --exclude-subdir
-```
-
-On a host:
+https://www.tensorflow.org/lite/guide/python
 
 ```bash
-sudo ./dist/OpenCV-<version>-<platform>.sh --prefix=/usr/local --exclude-subdir
+make wheelhouse
+make opencv
+make app
+xhost +local:docker
+docker run --rm -it --privileged -e "DISPLAY" --net host demo-app /bin/bash
 ```
