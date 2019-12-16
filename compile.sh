@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# To make this smaller, turn off BUILD_opencv_python2 or BUILD_opencv_python3.
-
 cmake \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr/local \

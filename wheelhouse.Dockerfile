@@ -33,7 +33,8 @@ ENV PIP_WHEEL_DIR=/wheelhouse
 ENV WHEELHOUSE=/wheelhouse
 ENV PIP_FIND_LINKS=/wheelhouse
 
-COPY /requirements.txt /requirements.txt
+ARG REQUIREMENTS_FILE
+COPY /${REQUIREMENTS_FILE} /requirements.txt
 RUN while read p; do python3 -m pip wheel $p; done < requirements.txt && \
     mv /requirements.txt /wheelhouse/
 
